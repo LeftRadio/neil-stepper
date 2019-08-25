@@ -1,0 +1,3 @@
+[submodule "libs/crc8"]
+	path = libs/crc8
+	url = https://github.com/LeftRadio/crc8
