@@ -34,6 +34,7 @@ volatile stepper_drv_t stepper_driver = {
   .full_step_index = 0,
   .step_subdelay_ms = 5,
   .do_step_req = 0,
+  .busy = 0,
 };
 
 void (*active_step_a)(uint32_t pwm);
@@ -239,9 +240,17 @@ static void _stepper_do_step(uint16_t pwm) {
       break;
 
       default:
+        return;
       break;
     }
-    htim16.Instance->CNT = 1;
+    /* */
+    __HAL_TIM_SET_COUNTER(&htim16, 0);
+    /* */
+    if ( !(htim16.Instance->CR1 & TIM_CR1_CEN) ) {
+        // host_send_str("T16 START");
+        __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);
+        __HAL_TIM_ENABLE(&htim16);
+    }
 }
 
 /* Exported functions --------------------------------------------------------*/
@@ -322,6 +331,8 @@ void stepper_start(void) {
   * @retval None
   */
 void stepper_do_next_step(void){
+    stepper_driver.busy = 1;
+    /* */
     if (stepper_driver.state == MOTOR_DISABLE) {
         stepper_stop();
         return;
@@ -339,8 +350,10 @@ void stepper_do_next_step(void){
             stepper_driver.full_step_index = STEP_D;
         }
     }
-
+    /* */
     _stepper_do_step(stepper_driver.pwm);
+    /* */
+    stepper_driver.busy = 0;
 }
 
 /* HAL Callbacks -------------------------------------------------------------*/
@@ -351,15 +364,20 @@ void stepper_do_next_step(void){
   * @retval None
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    /* hold current */
+    /* clear IT flag, stop timer */
+    __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);
+    __HAL_TIM_DISABLE(&htim16);
+
+    /* return if current stepping proccess not end */
+    if (stepper_driver.busy == 1) { return; }
+
+    /* set hold current */
     if (active_step_a != (void*)0) {
       active_step_a(stepper_driver.hold_pwm);
     }
     if (active_step_b != (void*)0) {
       active_step_b(stepper_driver.hold_pwm);
     }
-    /* Clear IT flag */
-    __HAL_TIM_CLEAR_FLAG(&htim16, TIM_FLAG_UPDATE);
 }
 
 /**
@@ -368,39 +386,40 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   * @retval None
   */
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-
+    /* */
+    __disable_irq();
+    /* */
     switch (GPIO_Pin) {
 
       case EN_Pin:
-        if ((EN_GPIO_Port->IDR & EN_Pin) != (uint32_t)GPIO_PIN_RESET) {
-          stepper_driver.state = MOTOR_DISABLE;
-          stepper_stop();
-        }
-        else {
-          stepper_driver.state = MOTOR_ENABLE;
-          stepper_start();
-        }
+          if ( HAL_GPIO_ReadPin(EN_GPIO_Port, EN_Pin) == GPIO_PIN_RESET ) {
+              stepper_driver.state = MOTOR_ENABLE;
+              stepper_start();
+          }
+          else {
+              stepper_driver.state = MOTOR_DISABLE;
+              stepper_stop();
+          }
       break;
 
       case DIR_Pin:
-        if ((DIR_GPIO_Port->IDR & DIR_Pin) != (uint32_t)GPIO_PIN_RESET) {
-          stepper_driver.direction = DIRECT;
-        }
-        else {
-          stepper_driver.direction = FORWARD;
-        }
+          if ( HAL_GPIO_ReadPin(DIR_GPIO_Port, DIR_Pin) == GPIO_PIN_RESET ) {
+              stepper_driver.direction = FORWARD;
+          }
+          else {
+              stepper_driver.direction = DIRECT;
+          }
       break;
 
       case STEP_Pin:
-        if ((DIR_GPIO_Port->IDR & DIR_Pin) != (uint32_t)GPIO_PIN_RESET) {
           stepper_driver.do_step_req = 1;
-        }
       break;
 
       default:
       break;
     }
-
+    /* */
+    __enable_irq();
 }
 
 /*******************************************************************************

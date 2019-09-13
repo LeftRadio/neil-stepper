@@ -5,7 +5,7 @@
 			"cmd":
 			[
 				"make",
-				"-j16"
+				"-j32"
 			],
 			"file_regex": "^(.*):(\\d+):(\\d+):\\s*(.*)$",
 			"name": "STM32 build",
@@ -15,7 +15,7 @@
 					"cmd":
 					[
 						"make",
-						"-j16",
+						"-j32",
 						"clean"
 					],
 					"name": "Clean",
@@ -24,7 +24,7 @@
 						"cmd":
 						[
 							"mingw32-make",
-							"-j16",
+							"-j32",
 							"clean"
 						]
 					}

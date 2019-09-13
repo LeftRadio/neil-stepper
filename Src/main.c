@@ -112,24 +112,17 @@ int main(void)
   stepper_driver.step_subdelay_ms = 0;
   stepper_start();
 
-  /* Enable and set EXTI line Interrupts (EN, STEP, DIR) */
-  HAL_NVIC_SetPriority(EXTI0_1_IRQn, 2, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_1_IRQn);
-  HAL_NVIC_SetPriority(EXTI4_15_IRQn, 3, 0);
-  HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
-
   ReceivedStateMachine_Start();
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
   while (1)
   {
       if (stepper_driver.do_step_req != 0) {
-          stepper_driver.do_step_req = 0;
           stepper_do_next_step();
+          stepper_driver.do_step_req = 0;
       }
     /* USER CODE END WHILE */
 
